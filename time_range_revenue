@@ -1,0 +1,130 @@
+--- Câu lệnh query để tính doanh thu theo lũy tiến daily, WTD, MTD, YTD
+--- 1. Tính CTE daily
+WITH daily AS (
+  SELECT
+    DATE(TransactionDate) AS transaction_date,
+    TransactionCategory,
+    main_code_Description,
+    SUM(TransactionAmount) AS TransactionAmount,
+    SUM(TransactionAmount + TaxAmount + ServiceCharge) AS Total_amount,
+    SUM(TransactionAmount_usd) AS TransactionAmount_usd,
+    SUM(TransactionAmount_usd + TaxAmount_usd + ServiceCharge_usd) AS Total_amount_usd
+  FROM `smile_fo_secondary_staging.Folio_transaction_clean`
+  WHERE TransactionAmount > 0
+  GROUP BY DATE(TransactionDate), TransactionCategory, main_code_Description
+),
+---2. Tính CTE week to day
+wtd AS (
+  SELECT
+    transaction_date,
+    TransactionCategory,
+    main_code_Description,
+    SUM(TransactionAmount) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date),
+                   EXTRACT(ISOWEEK FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS TransactionAmount,
+    SUM(Total_amount) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date),
+                   EXTRACT(ISOWEEK FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS Total_amount,
+    SUM(TransactionAmount_usd) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date),
+                   EXTRACT(ISOWEEK FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS TransactionAmount_usd,
+    SUM(Total_amount_usd) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date),
+                   EXTRACT(ISOWEEK FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS Total_amount_usd
+  FROM daily
+),
+
+---3. Tính CTE month to day
+mtd AS (
+  SELECT
+    transaction_date,
+    TransactionCategory,
+    main_code_Description,
+    SUM(TransactionAmount) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date),
+                   EXTRACT(MONTH FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS TransactionAmount,
+    SUM(Total_amount) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date),
+                   EXTRACT(MONTH FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS Total_amount,
+    SUM(TransactionAmount_usd) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date),
+                   EXTRACT(MONTH FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS TransactionAmount_usd,
+    SUM(Total_amount_usd) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date),
+                   EXTRACT(MONTH FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS Total_amount_usd
+  FROM daily
+),
+
+---4. Tính CTE year to day
+ytd AS (
+  SELECT
+    transaction_date,
+    TransactionCategory,
+    main_code_Description,
+    SUM(TransactionAmount) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS TransactionAmount,
+    SUM(Total_amount) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS Total_amount,
+    SUM(TransactionAmount_usd) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS TransactionAmount_usd,
+    SUM(Total_amount_usd) OVER (
+      PARTITION BY TransactionCategory, main_code_Description,
+                   EXTRACT(YEAR FROM transaction_date)
+      ORDER BY transaction_date
+      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS Total_amount_usd
+  FROM daily
+)
+
+SELECT 'Daily' AS time_range, * FROM daily
+UNION ALL
+SELECT 'WTD' AS time_range, * FROM wtd
+UNION ALL
+SELECT 'MTD' AS time_range, * FROM mtd
+UNION ALL
+SELECT 'YTD' AS time_range, * FROM ytd
+ORDER BY transaction_date, time_range;
