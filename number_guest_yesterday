@@ -1,0 +1,48 @@
+--- Tạo bảng số lượng khách mỗi ngày và số lượng khách ngày hôm qua + doanh thu mỗi ngày
+
+WITH daily AS (
+  SELECT 
+    h_date,
+    roomnight_status,
+    SUM(number_guest) AS number_guest,
+    SUM(RoomRate) AS RoomRate,
+    SUM(RoomRate_usd) AS RoomRate_usd
+  FROM `smile_fo_secondary_dwh.folio_daily_view`
+  GROUP BY GROUPING SETS ((h_date, roomnight_status))
+),
+
+daily_with_lag AS(
+  SELECT 
+  h_date,
+  roomnight_status AS roomnight_status,
+  number_guest,
+  LAG(number_guest) OVER (
+    PARTITION BY roomnight_status ORDER BY h_date
+  ) AS number_guest_yesterday,
+  RoomRate,
+  RoomRate_usd
+FROM daily
+),
+
+departure AS (
+  SELECT Departuredate AS leave_date,
+       roomnight_status,
+       SUM(number_guest) AS total_guest_departure
+FROM  `smile_fo_secondary_dwh.folio_daily_view`
+WHERE DATE_DIFF(Departuredate,h_date,day) = 1 ----- h_date: là mỗi đêm, Departuredate là ngày rời khỏi = h_date + 1. Thực hiện phép trừ 1 day để departuredate = h_date để dùng leave_day join với h_date
+GROUP BY leave_date,roomnight_status
+)
+SELECT d.h_date,
+       d.roomnight_status,
+       d.number_guest,
+       d.number_guest_yesterday,
+       d.RoomRate,
+       d.RoomRate_usd,
+       dep.total_guest_departure
+FROM daily_with_lag AS d
+LEFT JOIN departure AS dep
+ON d.h_date = dep.leave_date
+AND d.roomnight_status = dep.roomnight_status
+ORDER BY d.h_date,d.roomnight_status;
+
+
